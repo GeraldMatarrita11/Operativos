@@ -53,25 +53,20 @@ void merge(int arr[], int l, int m, int r) {
 }
 
 // Función recursiva para el algoritmo Merge Sort
-void* merge_sort_recursive(void* args) {
-    struct MergeArgs* mergeArgs = (struct MergeArgs*)args;
-    int *arr = mergeArgs->array;
-    int start = mergeArgs->start;
-    int end = mergeArgs->end;
-
-    if (start < end) {
-        int mid = start + (end - start) / 2;
-
-        // Dividir y ordenar recursivamente las dos mitades
-        struct MergeArgs leftArgs = { arr, start, mid };
-        struct MergeArgs rightArgs = { arr, mid + 1, end };
-
-        merge_sort_recursive((void*)&leftArgs);
-        merge_sort_recursive((void*)&rightArgs);
-
-        // Combinar las dos mitades ordenadas
-        merge(arr, start, mid, end);
+void merge_sort_recursive(int arr[], int l, int r) {
+    if (l < r) {
+        int m = l + (r - l) / 2;
+        merge_sort_recursive(arr, l, m);
+        merge_sort_recursive(arr, m + 1, r);
+        merge(arr, l, m, r);
     }
+}
+
+// Función para dividir el trabajo entre los hilos y ordenar el vector
+void* sort_thread(void* args) {
+    struct MergeArgs* mergeArgs = (struct MergeArgs*)args;
+    merge_sort_recursive(mergeArgs->array, mergeArgs->start, mergeArgs->end);
+    return NULL;
 }
 
 // Función para ordenar el vector usando Merge Sort de forma paralela
@@ -88,7 +83,7 @@ void merge_sort_parallel(int arr[], int n) {
         args[i].start = start;
         args[i].end = start + size - 1 + (i < remainder ? 1 : 0);
 
-        pthread_create(&threads[i], NULL, merge_sort_recursive, (void*)&args[i]);
+        pthread_create(&threads[i], NULL, sort_thread, (void*)&args[i]);
 
         start = args[i].end + 1;
     }
@@ -99,7 +94,7 @@ void merge_sort_parallel(int arr[], int n) {
 
     // Combinar los subvectores ordenados
     for (int i = 1; i < NUM_THREADS; ++i) {
-        merge(arr, 0, args[i - 1].end, args[i].end);
+        merge(arr, 0, (size * NUM_THREADS) - 1, n - 1);
     }
 }
 
@@ -153,11 +148,11 @@ int main() {
         cloned_vector[i] = vector[i];
     }
 
-    // Ordenar el vector utilizando Merge Sort
+    // Ordenar el vector utilizando Merge Sort (paralelo con 20 hilos)
     start_time = clock();
     merge_sort_parallel(cloned_vector, N);
     end_time = clock();
-    printf("Tiempo de ordenamiento usando Merge Sort paralelo: %.6f segundos\n",
+    printf("Tiempo de ordenamiento usando Merge Sort (paralelo con 20 hilos): %.6f segundos\n",
            (double)(end_time - start_time) / CLOCKS_PER_SEC);
 
     // Calcular la moda del vector (paralelo)
