@@ -199,7 +199,7 @@ int main() {
     // Clonar el vector original
     int *vectorClon2 = clonarVector(vector, N);
 
-    // Ordenar el vector utilizando Merge Sort (paralelo con 20 hilos) y medir el tiempo
+    // Ordenar el vector utilizando Merge Sort y medir el tiempo
     clock_t inicio2 = clock();
     merge_sort_parallel(vectorClon2, N);
     clock_t fin2 = clock();
