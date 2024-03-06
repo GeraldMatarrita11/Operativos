@@ -3,7 +3,7 @@
 #include <time.h>
 #include <pthread.h>
 
-#define NUM_THREADS 20
+#define NUM_THREADS 15
 
 // Estructura para pasar los argumentos a la función de fusión paralela
 struct MergeArgs {
@@ -12,39 +12,78 @@ struct MergeArgs {
     int end;
 };
 
-// Función de fusión para el algoritmo Merge Sort
+// Función para generar números aleatorios en el rango [-1000, 1000]
+int generarNumeroAleatorio() {
+    return rand() % 2001 - 1000;
+}
+
+// Función para imprimir un vector
+void imprimirVector(int *vector, int longitud) {
+    for (int i = 0; i < longitud; i++) {
+        printf("%d ", vector[i]);
+    }
+    printf("\n");
+}
+
+// Función para clonar un vector
+int* clonarVector(int *vector, int longitud) {
+    int *clon = (int*)malloc(longitud * sizeof(int));
+    if (clon == NULL) {
+        printf("Error: No se pudo asignar memoria para el clon del vector.\n");
+        exit(EXIT_FAILURE);
+    }
+    for (int i = 0; i < longitud; i++) {
+        clon[i] = vector[i];
+    }
+    return clon;
+}
+
+// Función para intercambiar dos elementos en un vector
+void intercambiar(int *a, int *b) {
+    int temp = *a;
+    *a = *b;
+    *b = temp;
+}
+
+// Función que fusiona dos subarreglos de arr[]
 void merge(int arr[], int l, int m, int r) {
     int i, j, k;
     int n1 = m - l + 1;
     int n2 = r - m;
 
+    // Creamos arreglos temporales
     int L[n1], R[n2];
 
+    // Copiamos datos a los arreglos temporales L[] y R[]
     for (i = 0; i < n1; i++)
         L[i] = arr[l + i];
     for (j = 0; j < n2; j++)
         R[j] = arr[m + 1 + j];
 
-    i = 0;
-    j = 0;
-    k = l;
+    // Combinamos los arreglos temporales en arr[l..r]
+    i = 0; // Índice inicial del primer subarreglo
+    j = 0; // Índice inicial del segundo subarreglo
+    k = l; // Índice inicial del subarreglo fusionado
     while (i < n1 && j < n2) {
         if (L[i] <= R[j]) {
             arr[k] = L[i];
             i++;
-        } else {
+        }
+        else {
             arr[k] = R[j];
             j++;
         }
         k++;
     }
 
+    // Copiamos los elementos restantes de L[], si hay alguno
     while (i < n1) {
         arr[k] = L[i];
         i++;
         k++;
     }
 
+    // Copiamos los elementos restantes de R[], si hay alguno
     while (j < n2) {
         arr[k] = R[j];
         j++;
@@ -52,20 +91,43 @@ void merge(int arr[], int l, int m, int r) {
     }
 }
 
-// Función recursiva para el algoritmo Merge Sort
-void merge_sort_recursive(int arr[], int l, int r) {
+// Función recursiva para ordenar un subarreglo de arr[]
+// utilizando el algoritmo de Merge Sort
+void merge_sort(int arr[], int l, int r) {
     if (l < r) {
+        // Encuentra el punto medio para dividir el arreglo en dos
         int m = l + (r - l) / 2;
-        merge_sort_recursive(arr, l, m);
-        merge_sort_recursive(arr, m + 1, r);
+
+        // Ordena la primera y la segunda mitad
+        merge_sort(arr, l, m);
+        merge_sort(arr, m + 1, r);
+
+        // Fusiona las mitades ordenadas
         merge(arr, l, m, r);
+    }
+}
+
+// Función de ordenamiento de burbuja
+void bubbleSort(int arr[], int n) {
+    for (int i = 0; i < n-1; i++) {
+        for (int j = 0; j < n-i-1; j++) {
+            if (arr[j] > arr[j+1]) {
+                intercambiar(&arr[j], &arr[j+1]);
+            }
+        }
     }
 }
 
 // Función para dividir el trabajo entre los hilos y ordenar el vector
 void* sort_thread(void* args) {
     struct MergeArgs* mergeArgs = (struct MergeArgs*)args;
-    merge_sort_recursive(mergeArgs->array, mergeArgs->start, mergeArgs->end);
+    int* arr = mergeArgs->array;
+    int start = mergeArgs->start;
+    int end = mergeArgs->end;
+
+    // Ordenar la parte asignada del arreglo
+    bubbleSort(arr + start, end - start + 1);
+
     return NULL;
 }
 
@@ -98,70 +160,59 @@ void merge_sort_parallel(int arr[], int n) {
     }
 }
 
-// Función para calcular la moda del vector
-int find_mode(int arr[], int n) {
-    int max_count = 0, mode = -1;
-    for (int i = 0; i < n; i++) {
-        int count = 0;
-        for (int j = 0; j < n; j++) {
-            if (arr[j] == arr[i])
-                count++;
-        }
-        if (count > max_count) {
-            max_count = count;
-            mode = arr[i];
-        }
-    }
-    return mode;
-}
-
 int main() {
     int N;
-
-    // Solicitar al usuario el número de elementos
-    printf("Ingrese el número de elementos (N): ");
+    printf("Ingrese la cantidad de numeros enteros aleatorios a generar: ");
     scanf("%d", &N);
 
-    // Crear un vector de tamaño N
-    int vector[N];
+    // Semilla para la generación de números aleatorios
+    srand(time(0));
 
-    // Generar y almacenar números aleatorios en el vector
-    for (int i = 0; i < N; ++i) {
-        vector[i] = rand() % 2001 - 1000; // Números aleatorios en el rango [-1000, 1000]
+    // Crear un vector y generar números aleatorios
+    int *vector = (int*)malloc(N * sizeof(int));
+    if (vector == NULL) {
+        printf("Error: No se pudo asignar memoria para el vector.\n");
+        return EXIT_FAILURE;
     }
-
-    // Clonar el vector
-    int cloned_vector[N];
     for (int i = 0; i < N; i++) {
-        cloned_vector[i] = vector[i];
+        vector[i] = generarNumeroAleatorio();
     }
 
-    // Ordenar el vector utilizando Merge Sort (versión tradicional)
-    clock_t start_time = clock();
-    merge_sort_parallel(cloned_vector, N);
-    clock_t end_time = clock();
-    printf("Tiempo de ordenamiento usando Merge Sort (versión tradicional): %.6f segundos\n",
-           (double)(end_time - start_time) / CLOCKS_PER_SEC);
+//     Imprimir el vector original
+//    printf("Vector original:\n");
+//    imprimirVector(vector, N);
 
-    // Clonar el vector nuevamente
-    for (int i = 0; i < N; i++) {
-        cloned_vector[i] = vector[i];
-    }
+    // Clonar el vector original
+    int *vectorClon = clonarVector(vector, N);
 
-    // Ordenar el vector utilizando Merge Sort (paralelo con 20 hilos)
-    start_time = clock();
-    merge_sort_parallel(cloned_vector, N);
-    end_time = clock();
-    printf("Tiempo de ordenamiento usando Merge Sort (paralelo con 20 hilos): %.6f segundos\n",
-           (double)(end_time - start_time) / CLOCKS_PER_SEC);
+    // Ordenar el vector clonado usando Merge Sort y medir el tiempo
+    clock_t inicio = clock();
+    merge_sort(vectorClon, 0, N - 1);
+    clock_t fin = clock();
+    double tiempo = (double)(fin - inicio) / CLOCKS_PER_SEC;
 
-    // Calcular la moda del vector (paralelo)
-    start_time = clock();
-    int mode = find_mode(vector, N);
-    end_time = clock();
-    printf("Moda del vector: %d\n", mode);
-    printf("Tiempo de cálculo de la moda: %.6f segundos\n",
-           (double)(end_time - start_time) / CLOCKS_PER_SEC);
+    // Imprimir el vector ordenado y el tiempo que tomó ordenarlo
+//    printf("\nVector ordenado:\n");
+//    imprimirVector(vectorClon, N);
+    printf("\nTiempo de ordenamiento usando Merge Sort: %.6f segundos\n", tiempo);
+
+    // Clonar el vector original
+    int *vectorClon2 = clonarVector(vector, N);
+
+    // Ordenar el vector utilizando Merge Sort (paralelo con 20 hilos) y medir el tiempo
+    clock_t inicio2 = clock();
+    merge_sort_parallel(vectorClon2, N);
+    clock_t fin2 = clock();
+    double tiempo2 = (double)(fin2 - inicio2) / CLOCKS_PER_SEC;
+
+    // Imprimir el vector ordenado y el tiempo que tomó ordenarlo
+//    printf("\nVector ordenado:\n");
+//    imprimirVector(vectorClon2, N);
+    printf("\nTiempo de ordenamiento usando Merge Sort Paralelo: %.6f segundos\n", tiempo2);
+
+    // Liberar memoria
+    free(vector);
+    free(vectorClon);
 
     return 0;
 }
