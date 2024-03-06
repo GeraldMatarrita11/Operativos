@@ -12,6 +12,15 @@ struct MergeArgs {
     int end;
 };
 
+// Estructura para pasar argumentos a la función de los hilos
+struct ThreadArgs {
+    int *vector;
+    int start;
+    int end;
+    int *ocurrencias;
+};
+
+
 // Función para generar números aleatorios en el rango [-1000, 1000]
 int generarNumeroAleatorio() {
     return rand() % 2001 - 1000;
@@ -160,6 +169,74 @@ void merge_sort_parallel(int arr[], int n) {
     }
 }
 
+// Función para encontrar la moda en un rango del vector
+void* findMode(void* arg) {
+    struct ThreadArgs* threadArgs = (struct ThreadArgs*)arg;
+    int *vector = threadArgs->vector;
+    int start = threadArgs->start;
+    int end = threadArgs->end;
+    int *ocurrencias = threadArgs->ocurrencias;
+
+    // Inicializar el arreglo de ocurrencias
+    for (int i = start; i <= end; ++i) {
+        ocurrencias[vector[i]] = 0;
+    }
+
+    // Contar las ocurrencias en el rango asignado
+    for (int i = start; i <= end; ++i) {
+        ocurrencias[vector[i]]++;
+    }
+
+    return NULL;
+}
+
+// Función para encontrar la moda global a partir de los resultados de los hilos
+int findGlobalMode(int *ocurrencias, int n) {
+    int moda = 0;
+    int max_ocurrencias = 0;
+
+    for (int i = 0; i < n; ++i) {
+        if (ocurrencias[i] > max_ocurrencias) {
+            max_ocurrencias = ocurrencias[i];
+            moda = i;
+        }
+    }
+
+    return moda;
+}
+
+// Función para calcular la moda de un vector de manera paralela
+int calculateModeParallel(int *vector, int n) {
+    int *ocurrencias = (int*)calloc(1001, sizeof(int)); // Contador de ocurrencias, asumiendo que los números están en el rango [-1000, 1000]
+    pthread_t threads[NUM_THREADS];
+    struct ThreadArgs args[NUM_THREADS];
+    int partitionSize = n / NUM_THREADS;
+    int remainder = n % NUM_THREADS;
+
+    // Crear y ejecutar los hilos
+    for (int i = 0; i < NUM_THREADS; ++i) {
+        args[i].vector = vector;
+        args[i].start = i * partitionSize;
+        args[i].end = (i == NUM_THREADS - 1) ? ((i + 1) * partitionSize) + remainder - 1 : (i + 1) * partitionSize - 1;
+        args[i].ocurrencias = ocurrencias;
+
+        pthread_create(&threads[i], NULL, findMode, (void*)&args[i]);
+    }
+
+    // Esperar a que los hilos terminen
+    for (int i = 0; i < NUM_THREADS; ++i) {
+        pthread_join(threads[i], NULL);
+    }
+
+    // Calcular la moda global
+    int moda = findGlobalMode(ocurrencias, 1001);
+
+    // Liberar la memoria
+    free(ocurrencias);
+
+    return moda;
+}
+
 int main() {
     int N;
     printf("Ingrese la cantidad de numeros enteros aleatorios a generar: ");
@@ -210,9 +287,17 @@ int main() {
 //    imprimirVector(vectorClon2, N);
     printf("\nTiempo de ordenamiento usando Merge Sort Paralelo: %.6f segundos\n", tiempo2);
 
+    // Calcular la moda de manera paralela
+    int moda = calculateModeParallel(vector, N);
+
+    // Imprimir la moda
+    printf("La moda del vector es: %d\n", moda);
+
+
     // Liberar memoria
     free(vector);
     free(vectorClon);
+    free(vectorClon2);
 
     return 0;
 }
